@@ -1,15 +1,354 @@
-
+import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Rule-based vs AI 의사결정 비교", page_icon="🏭", layout="wide")
+from utils import (
+    FEATURES,
+    SCENARIOS,
+    difference_explanation,
+    load_test_data,
+    predict_ai,
+    rule_based_decision,
+    style_result,
+)
 
-st.title("🏭 Rule-based vs AI-based 의사결정 비교 실습")
-st.markdown("""
-이 웹앱은 **규칙 기반 의사결정**과 **AI 기반 의사결정**이 어떻게 다른지 체험하기 위한 교육용 데모입니다.
+# -----------------------------------
+# 기본 설정
+# -----------------------------------
+st.set_page_config(
+    page_title="Rule-based vs AI-based 의사결정 비교",
+    page_icon="🏭",
+    layout="wide"
+)
+
+# -----------------------------------
+# 공통 스타일
+# -----------------------------------
+def highlight_unknown_row(row):
+    """
+    Rule-based 결과가 '판단못함'인 경우
+    해당 행 전체를 노란색으로 강조
+    """
+    if row.get("rule_based_result", "") == "판단못함":
+        return ["background-color: #fff3b0"] * len(row)
+    return [""] * len(row)
+
+
+def show_intro_page():
+    st.title("🏭 Rule-based .vs. AI-based 웹앱 소개")
+
+    st.markdown("""
+이 웹앱은 **Rule-based 의사결정**과 **AI-based 의사결정**의 차이를  
+현업 담당자가 직접 체험할 수 있도록 만든 교육용 실습 도구입니다.
+
+### 이 웹앱의 목적
+- 사람이 만든 **규칙 기반 판단**이 어떻게 동작하는지 이해
+- **AI가 학습 데이터를 기반으로 판단**하는 방식 이해
+- 두 방식이 **언제 같고, 언제 달라지는지** 직접 비교
+- 현업에서 왜 AI 기반 의사결정이 필요한지 직관적으로 이해
+
+---
 
 ### 구성
-- **페이지 1:** CSV 테스트 데이터를 불러와 Rule-based와 AI-based 결과를 비교
-- **페이지 2:** 사용자가 슬라이더로 값을 조정하며 두 방식의 차이를 즉시 확인
+#### 1) Test 데이터로 비교해보기
+- 준비된 CSV 테스트 데이터를 불러옵니다.
+- 각 행에 대해 **Rule-based 결과**와 **AI-based 결과**를 동시에 비교합니다.
+- 특히 Rule-based에서 **'판단못함'** 인 케이스를 쉽게 확인할 수 있습니다.
+
+#### 2) 사용자 입력으로 비교해보기
+- 사용자가 슬라이더로 직접 입력값을 조절합니다.
+- Rule-based와 AI-based의 결과를 즉시 비교할 수 있습니다.
+- 추천 시나리오를 불러와 차이를 설명할 수 있습니다.
+
+---
+
+### 실습에서 전달하고 싶은 핵심 메시지
+#### Rule-based의 장점
+- 이해하기 쉽습니다.
+- 기준이 명확합니다.
+- 바로 적용할 수 있습니다.
+
+#### Rule-based의 한계
+- 규칙에 없는 상황은 판단하지 못합니다.
+- 복합적인 패턴 반영이 어렵습니다.
+- 새로운 변수(예: 습도)가 들어오면 다시 규칙을 수정해야 합니다.
+
+#### AI-based의 장점
+- 여러 변수의 조합 패턴을 반영할 수 있습니다.
+- 사람이 명시적으로 규칙을 쓰지 않은 경우도 판정할 수 있습니다.
+- 복잡한 중간 영역을 다룰 수 있습니다.
+
+#### 주의할 점
+- AI가 항상 더 낫다는 뜻은 아닙니다.
+- 실제 현업에서는 **Rule-based + AI-based 보완 구조**가 현실적입니다.
 """)
 
-st.info("왼쪽 사이드바에서 페이지를 선택하세요.")
+    st.info("왼쪽 사이드바에서 실습 페이지를 선택해 주세요.")
+
+
+def show_test_compare_page():
+    st.title("📄 Test 데이터로 비교해보기")
+    st.caption("CSV 테스트 데이터를 불러와 Rule-based와 AI-based 결과를 비교합니다.")
+
+    df = load_test_data().copy()
+
+    rule_results = []
+    rule_reasons = []
+    ai_results = []
+
+    for _, row in df.iterrows():
+        row_dict = row.to_dict()
+
+        rule_result, rule_reason = rule_based_decision(row_dict)
+        ai_result, _ = predict_ai(row_dict)
+
+        rule_results.append(rule_result)
+        rule_reasons.append(rule_reason)
+        ai_results.append(ai_result)
+
+    df["rule_based_result"] = rule_results
+    df["rule_reason"] = rule_reasons
+    df["ai_based_result"] = ai_results
+    df["same_or_diff"] = df.apply(
+        lambda x: "같음" if x["rule_based_result"] == x["ai_based_result"] else "다름",
+        axis=1
+    )
+
+    st.markdown("## 전체 비교 결과")
+
+    styled_df = df[
+        FEATURES + ["rule_based_result", "rule_reason", "ai_based_result", "same_or_diff"]
+    ].style.apply(highlight_unknown_row, axis=1)
+
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.warning("노란색으로 표시된 행은 Rule-based에서 '판단못함'으로 처리된 케이스입니다.")
+
+    st.markdown("---")
+
+    left, right = st.columns(2)
+
+    with left:
+        st.subheader("Rule-based 결과")
+        styled_rule_df = df[
+            FEATURES + ["rule_based_result", "rule_reason"]
+        ].style.apply(highlight_unknown_row, axis=1)
+
+        st.dataframe(
+            styled_rule_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with right:
+        st.subheader("AI-based 결과")
+        st.dataframe(
+            df[FEATURES + ["ai_based_result"]],
+            use_container_width=True,
+            hide_index=True
+        )
+
+    st.markdown("---")
+    st.subheader("Rule-based가 판단못함인 케이스만 보기")
+
+    unknown_df = df[df["rule_based_result"] == "판단못함"].copy()
+
+    if unknown_df.empty:
+        st.success("현재 테스트 데이터에는 '판단못함' 케이스가 없습니다.")
+    else:
+        styled_unknown_df = unknown_df[
+            FEATURES + ["rule_based_result", "rule_reason", "ai_based_result"]
+        ].style.apply(highlight_unknown_row, axis=1)
+
+        st.dataframe(
+            styled_unknown_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        for idx, row in unknown_df.iterrows():
+            with st.expander(f"샘플 {idx + 1} 상세 해설"):
+                row_dict = row[FEATURES].to_dict()
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown("### Rule-based")
+                    st.metric("판정", style_result(row["rule_based_result"]))
+                    st.write(row["rule_reason"])
+
+                with col2:
+                    st.markdown("### AI-based")
+                    st.metric("판정", style_result(row["ai_based_result"]))
+                    _, probs = predict_ai(row_dict)
+                    if probs:
+                        prob_df = pd.DataFrame({
+                            "class": list(probs.keys()),
+                            "probability": list(probs.values())
+                        })
+                        st.bar_chart(prob_df.set_index("class"))
+
+                st.markdown("### 해설")
+                messages = difference_explanation(
+                    row_dict,
+                    row["rule_based_result"],
+                    row["ai_based_result"]
+                )
+                for msg in messages:
+                    st.write("- " + msg)
+
+    st.markdown("---")
+    st.subheader("샘플 하나씩 상세 확인")
+
+    selected_idx = st.selectbox(
+        "확인할 샘플 선택",
+        options=list(range(len(df))),
+        format_func=lambda x: f"샘플 {x + 1}"
+    )
+
+    selected = df.iloc[selected_idx]
+    row_dict = selected[FEATURES].to_dict()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### Rule-based")
+        st.metric("판정", style_result(selected["rule_based_result"]))
+        st.write(selected["rule_reason"])
+
+    with col2:
+        st.markdown("### AI-based")
+        st.metric("판정", style_result(selected["ai_based_result"]))
+        _, probs = predict_ai(row_dict)
+        if probs:
+            prob_df = pd.DataFrame({
+                "class": list(probs.keys()),
+                "probability": list(probs.values())
+            })
+            st.bar_chart(prob_df.set_index("class"))
+
+    st.markdown("### 자동 해설")
+    for msg in difference_explanation(
+        row_dict,
+        selected["rule_based_result"],
+        selected["ai_based_result"]
+    ):
+        st.write("- " + msg)
+
+
+def show_user_input_page():
+    st.title("🎛️ 사용자 입력으로 비교해보기")
+    st.caption("슬라이더로 값을 조정하며 Rule-based와 AI-based 결과를 즉시 비교합니다.")
+
+    scenario_name = st.selectbox(
+        "추천 예시 불러오기",
+        ["직접 입력"] + list(SCENARIOS.keys())
+    )
+
+    defaults = {
+        "temperature": 70.0,
+        "pressure": 50.0,
+        "vibration": 5.0,
+        "process_time": 60.0,
+        "humidity": 50.0,
+    }
+
+    if scenario_name != "직접 입력":
+        defaults = SCENARIOS[scenario_name].copy()
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("입력값 조정")
+
+    temperature = st.sidebar.slider("온도", 55.0, 90.0, float(defaults["temperature"]), 0.1)
+    pressure = st.sidebar.slider("압력", 35.0, 65.0, float(defaults["pressure"]), 0.1)
+    vibration = st.sidebar.slider("진동", 2.0, 9.5, float(defaults["vibration"]), 0.1)
+    process_time = st.sidebar.slider("가공시간", 40.0, 85.0, float(defaults["process_time"]), 0.1)
+    humidity = st.sidebar.slider("습도", 25.0, 80.0, float(defaults["humidity"]), 0.1)
+
+    row_dict = {
+        "temperature": temperature,
+        "pressure": pressure,
+        "vibration": vibration,
+        "process_time": process_time,
+        "humidity": humidity,
+    }
+
+    st.subheader("현재 입력값")
+    input_df = pd.DataFrame([row_dict])[FEATURES]
+    st.dataframe(input_df, use_container_width=True, hide_index=True)
+
+    rule_result, rule_reason = rule_based_decision(row_dict)
+    ai_result, probs = predict_ai(row_dict)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### Rule-based 결과")
+        st.metric("판정", style_result(rule_result))
+        st.write(rule_reason)
+
+        st.markdown("#### Rule-based 특징")
+        st.write("- 사람이 정의한 규칙만 적용합니다.")
+        st.write("- 규칙에 없는 조합은 '판단못함'입니다.")
+        st.write("- 현재 데모에서는 습도 조건을 보지 않습니다.")
+
+    with col2:
+        st.markdown("### AI-based 결과")
+        st.metric("판정", style_result(ai_result))
+        st.write("학습된 패턴을 바탕으로 현재 입력의 품질 상태를 예측합니다.")
+
+        if probs:
+            prob_df = pd.DataFrame({
+                "class": list(probs.keys()),
+                "probability": list(probs.values())
+            })
+            st.bar_chart(prob_df.set_index("class"))
+
+    st.markdown("---")
+    st.subheader("자동 해설")
+    for msg in difference_explanation(row_dict, rule_result, ai_result):
+        st.write("- " + msg)
+
+    st.markdown("---")
+    st.subheader("강의용 설명 포인트")
+
+    if rule_result == "판단못함":
+        st.info(
+            "이 케이스는 Rule-based가 정의한 조건 바깥에 있으므로 판단을 내리지 못합니다. "
+            "AI는 과거 데이터 패턴을 기반으로 판정을 시도합니다."
+        )
+    elif rule_result == ai_result:
+        st.success(
+            "이 케이스는 Rule-based와 AI-based가 같은 결론을 내렸습니다. "
+            "명확한 상황에서는 Rule-based도 충분히 효과적입니다."
+        )
+    else:
+        st.warning(
+            "두 방식의 결과가 다릅니다. "
+            "규칙의 단순성과 AI의 패턴 학습 차이를 설명하기 좋은 사례입니다."
+        )
+
+
+# -----------------------------------
+# 사이드바 네비게이션
+# -----------------------------------
+st.sidebar.title("메뉴")
+
+page = st.sidebar.radio(
+    "페이지 선택",
+    [
+        "Rule-based .vs. AI-based 웹앱 소개",
+        "Test 데이터로 비교해보기",
+        "사용자 입력으로 비교해보기",
+    ]
+)
+
+if page == "Rule-based .vs. AI-based 웹앱 소개":
+    show_intro_page()
+elif page == "Test 데이터로 비교해보기":
+    show_test_compare_page()
+elif page == "사용자 입력으로 비교해보기":
+    show_user_input_page()
