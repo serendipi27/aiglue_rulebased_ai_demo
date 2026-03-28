@@ -383,12 +383,10 @@ def show_user_input_page():
     st.title("🎛️ 사용자 입력으로 비교해보기")
     st.caption("슬라이더로 값을 조정하며 Rule-based와 AI-based 결과를 즉시 비교합니다.")
 
-    scenario_name = st.selectbox(
-        "추천 예시 불러오기",
-        ["직접 입력"] + list(SCENARIOS.keys())
-    )
-
-    defaults = {
+    # -------------------------------
+    # 슬라이더 상태 초기화
+    # -------------------------------
+    default_manual = {
         "temperature": 70.0,
         "pressure": 50.0,
         "vibration": 5.0,
@@ -396,32 +394,88 @@ def show_user_input_page():
         "humidity": 50.0,
     }
 
-    if scenario_name != "직접 입력":
-        defaults = SCENARIOS[scenario_name].copy()
+    if "user_input_initialized" not in st.session_state:
+        st.session_state.user_input_initialized = True
+        st.session_state.temperature = default_manual["temperature"]
+        st.session_state.pressure = default_manual["pressure"]
+        st.session_state.vibration = default_manual["vibration"]
+        st.session_state.process_time = default_manual["process_time"]
+        st.session_state.humidity = default_manual["humidity"]
 
+    def apply_scenario_values(values: dict):
+        st.session_state.temperature = float(values["temperature"])
+        st.session_state.pressure = float(values["pressure"])
+        st.session_state.vibration = float(values["vibration"])
+        st.session_state.process_time = float(values["process_time"])
+        st.session_state.humidity = float(values["humidity"])
+
+    scenario_name = st.selectbox(
+        "추천 예시 불러오기",
+        ["직접 입력"] + list(SCENARIOS.keys()),
+        key="scenario_select"
+    )
+
+    # 추천 예시 적용 버튼
+    col_btn1, col_btn2 = st.columns([1, 3])
+    with col_btn1:
+        if st.button("예시 적용", use_container_width=True):
+            if scenario_name == "직접 입력":
+                apply_scenario_values(default_manual)
+            else:
+                apply_scenario_values(SCENARIOS[scenario_name])
+
+    with col_btn2:
+        st.caption("추천 예시를 고른 뒤 '예시 적용' 버튼을 누르면 슬라이더 값이 해당 예시로 바뀝니다.")
+
+    # -------------------------------
+    # 입력 슬라이더
+    # -------------------------------
     input_col1, input_col2 = st.columns(2)
 
     with input_col1:
-        temperature = st.slider("온도", 55.0, 90.0, float(defaults["temperature"]), 0.1)
-        pressure = st.slider("압력", 35.0, 65.0, float(defaults["pressure"]), 0.1)
-        vibration = st.slider("진동", 2.0, 9.5, float(defaults["vibration"]), 0.1)
+        temperature = st.slider(
+            "온도", 55.0, 90.0,
+            key="temperature",
+            step=0.1
+        )
+        pressure = st.slider(
+            "압력", 35.0, 65.0,
+            key="pressure",
+            step=0.1
+        )
+        vibration = st.slider(
+            "진동", 2.0, 9.5,
+            key="vibration",
+            step=0.1
+        )
 
     with input_col2:
-        process_time = st.slider("가공시간", 40.0, 85.0, float(defaults["process_time"]), 0.1)
-        humidity = st.slider("습도", 25.0, 80.0, float(defaults["humidity"]), 0.1)
+        process_time = st.slider(
+            "가공시간", 40.0, 85.0,
+            key="process_time",
+            step=0.1
+        )
+        humidity = st.slider(
+            "습도", 25.0, 80.0,
+            key="humidity",
+            step=0.1
+        )
 
     row_dict = {
-        "temperature": temperature,
-        "pressure": pressure,
-        "vibration": vibration,
-        "process_time": process_time,
-        "humidity": humidity,
+        "temperature": float(temperature),
+        "pressure": float(pressure),
+        "vibration": float(vibration),
+        "process_time": float(process_time),
+        "humidity": float(humidity),
     }
 
     st.subheader("현재 입력값")
     input_df = pd.DataFrame([row_dict])[FEATURES]
     st.dataframe(input_df, use_container_width=True, hide_index=False)
 
+    # -------------------------------
+    # Rule / AI 판정
+    # -------------------------------
     rule_result, rule_reason = rule_based_decision(row_dict)
     ai_result, probs = predict_ai(row_dict)
 
