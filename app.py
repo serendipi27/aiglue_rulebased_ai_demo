@@ -67,6 +67,53 @@ def highlight_unknown_row(row):
     return [""] * len(row)
 
 
+def validate_uploaded_dataframe(df: pd.DataFrame):
+    """
+    업로드된 파일의 컬럼 구조가 FEATURES와 동일한지 검사
+    """
+    actual_cols = list(df.columns)
+    expected_cols = FEATURES
+
+    if actual_cols != expected_cols:
+        return False, (
+            "업로드한 파일의 컬럼 구조가 올바르지 않습니다.\n\n"
+            f"- 현재 컬럼: {actual_cols}\n"
+            f"- 필요한 컬럼: {expected_cols}"
+        )
+    return True, ""
+
+
+def run_decision_on_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    입력 데이터프레임에 대해 Rule-based / AI-based 결과 계산
+    """
+    result_df = df.copy()
+
+    rule_results = []
+    rule_reasons = []
+    ai_results = []
+
+    for _, row in result_df.iterrows():
+        row_dict = row.to_dict()
+
+        rule_result, rule_reason = rule_based_decision(row_dict)
+        ai_result, _ = predict_ai(row_dict)
+
+        rule_results.append(rule_result)
+        rule_reasons.append(rule_reason)
+        ai_results.append(ai_result)
+
+    result_df["rule_based_result"] = rule_results
+    result_df["rule_reason"] = rule_reasons
+    result_df["ai_based_result"] = ai_results
+    result_df["same_or_diff"] = result_df.apply(
+        lambda x: "같음" if x["rule_based_result"] == x["ai_based_result"] else "다름",
+        axis=1
+    )
+
+    return result_df
+
+
 # -----------------------------------
 # 사이드바 페이지 버튼
 # -----------------------------------
@@ -77,6 +124,7 @@ def render_sidebar_navigation():
     intro_type = "primary" if st.session_state.selected_page == "intro" else "secondary"
     test_type = "primary" if st.session_state.selected_page == "test" else "secondary"
     user_type = "primary" if st.session_state.selected_page == "user" else "secondary"
+    mfg_type = "primary" if st.session_state.selected_page == "mfg_quality" else "secondary"
 
     if st.sidebar.button(
         "Rule-based .vs. AI-based 웹앱 소개",
@@ -101,6 +149,14 @@ def render_sidebar_navigation():
         key="btn_user"
     ):
         st.session_state.selected_page = "user"
+
+    if st.sidebar.button(
+        "제조데이터 품질검사",
+        use_container_width=True,
+        type=mfg_type,
+        key="btn_mfg_quality"
+    ):
+        st.session_state.selected_page = "mfg_quality"
 
 
 # -----------------------------------
@@ -131,6 +187,11 @@ def show_intro_page():
 - 사용자가 슬라이더로 직접 입력값을 조절합니다.
 - Rule-based와 AI-based의 결과를 즉시 비교할 수 있습니다.
 - 추천 시나리오를 불러와 차이를 설명할 수 있습니다.
+
+#### 3) 제조데이터 품질검사
+- CSV 파일을 업로드합니다.
+- 업로드한 제조데이터를 표로 확인합니다.
+- 버튼을 눌러 Rule-based와 AI-based 품질검사를 동시에 수행합니다.
 
 ---
 
@@ -338,14 +399,16 @@ def show_user_input_page():
     if scenario_name != "직접 입력":
         defaults = SCENARIOS[scenario_name].copy()
 
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("입력값 조정")
+    input_col1, input_col2 = st.columns(2)
 
-    temperature = st.sidebar.slider("온도", 55.0, 90.0, float(defaults["temperature"]), 0.1)
-    pressure = st.sidebar.slider("압력", 35.0, 65.0, float(defaults["pressure"]), 0.1)
-    vibration = st.sidebar.slider("진동", 2.0, 9.5, float(defaults["vibration"]), 0.1)
-    process_time = st.sidebar.slider("가공시간", 40.0, 85.0, float(defaults["process_time"]), 0.1)
-    humidity = st.sidebar.slider("습도", 25.0, 80.0, float(defaults["humidity"]), 0.1)
+    with input_col1:
+        temperature = st.slider("온도", 55.0, 90.0, float(defaults["temperature"]), 0.1)
+        pressure = st.slider("압력", 35.0, 65.0, float(defaults["pressure"]), 0.1)
+        vibration = st.slider("진동", 2.0, 9.5, float(defaults["vibration"]), 0.1)
+
+    with input_col2:
+        process_time = st.slider("가공시간", 40.0, 85.0, float(defaults["process_time"]), 0.1)
+        humidity = st.slider("습도", 25.0, 80.0, float(defaults["humidity"]), 0.1)
 
     row_dict = {
         "temperature": temperature,
@@ -412,6 +475,95 @@ def show_user_input_page():
 
 
 # -----------------------------------
+# 제조데이터 품질검사 페이지
+# -----------------------------------
+def show_manufacturing_quality_page():
+    st.title("🧪 제조데이터 품질검사")
+    st.caption("CSV 파일을 업로드하고 Rule-based와 AI-based 품질검사 결과를 확인합니다.")
+
+    st.markdown("### 1. 제조데이터 업로드")
+    st.write("아래 CSV 파일을 업로드해 주세요.")
+
+    uploaded_file = st.file_uploader(
+        "CSV 파일 업로드",
+        type=["csv"],
+        key="manufacturing_quality_upload"
+    )
+
+    if uploaded_file is None:
+        st.info("품질검사를 진행하려면 CSV 파일을 업로드해 주세요.")
+        st.markdown("#### 필요한 컬럼 구조")
+        st.code(", ".join(FEATURES))
+        return
+
+    try:
+        upload_df = pd.read_csv(uploaded_file)
+    except Exception as e:
+        st.error(f"파일을 읽는 중 오류가 발생했습니다: {e}")
+        return
+
+    is_valid, error_msg = validate_uploaded_dataframe(upload_df)
+    if not is_valid:
+        st.error(error_msg)
+        st.markdown("#### 필요한 컬럼 구조")
+        st.code(", ".join(FEATURES))
+        return
+
+    st.markdown("### 2. 업로드한 파일 내용")
+    st.dataframe(upload_df, use_container_width=True, hide_index=True)
+
+    run_button = st.button(
+        "제조데이터 품질검사 실시",
+        type="primary",
+        use_container_width=False,
+        key="run_manufacturing_quality_check"
+    )
+
+    if run_button:
+        result_df = run_decision_on_dataframe(upload_df)
+
+        st.markdown("---")
+        st.markdown("## 3. 품질검사 결과")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("Rule-based 결과")
+            rule_df = result_df[FEATURES + ["rule_based_result", "rule_reason"]].copy()
+            styled_rule_df = rule_df.style.apply(highlight_unknown_row, axis=1)
+            st.dataframe(
+                styled_rule_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        with col2:
+            st.subheader("AI-based 결과")
+            ai_df = result_df[FEATURES + ["ai_based_result"]].copy()
+            st.dataframe(
+                ai_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        unknown_count = (result_df["rule_based_result"] == "판단못함").sum()
+        diff_count = (result_df["same_or_diff"] == "다름").sum()
+
+        st.markdown("---")
+        summary_col1, summary_col2, summary_col3 = st.columns(3)
+
+        with summary_col1:
+            st.metric("전체 데이터 수", len(result_df))
+        with summary_col2:
+            st.metric("Rule-based 판단못함", int(unknown_count))
+        with summary_col3:
+            st.metric("두 방식 결과 다름", int(diff_count))
+
+        if unknown_count > 0:
+            st.warning("노란색으로 표시된 행은 Rule-based에서 '판단못함'으로 처리된 케이스입니다.")
+
+
+# -----------------------------------
 # 실행
 # -----------------------------------
 render_sidebar_navigation()
@@ -422,5 +574,7 @@ elif st.session_state.selected_page == "test":
     show_test_compare_page()
 elif st.session_state.selected_page == "user":
     show_user_input_page()
+elif st.session_state.selected_page == "mfg_quality":
+    show_manufacturing_quality_page()
 else:
     show_intro_page()
