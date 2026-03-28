@@ -1,4 +1,3 @@
-
 import pandas as pd
 import streamlit as st
 
@@ -19,6 +18,21 @@ st.set_page_config(
     page_title="Rule-based vs AI-based 의사결정 비교",
     page_icon="🏭",
     layout="wide"
+)
+
+# -----------------------------------
+# 기본 멀티페이지 사이드바 숨기기
+# (pages 폴더가 있어도 상단 app / CSV 비교 / 직접 입력 비교 안 보이게)
+# -----------------------------------
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebarNav"] {
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # -----------------------------------
@@ -83,7 +97,7 @@ def show_intro_page():
 - 실제 현업에서는 **Rule-based + AI-based 보완 구조**가 현실적입니다.
 """)
 
-    st.info("왼쪽 사이드바에서 실습 페이지를 선택해 주세요.")
+    st.info("왼쪽 사이드바에서 페이지를 선택해 주세요.")
 
 
 def show_test_compare_page():
@@ -338,13 +352,15 @@ def show_user_input_page():
 # -----------------------------------
 st.sidebar.title("메뉴")
 
-page = st.sidebar.radio(
+page = st.sidebar.segmented_control(
     "페이지 선택",
-    [
+    options=[
         "Rule-based .vs. AI-based 웹앱 소개",
         "Test 데이터로 비교해보기",
         "사용자 입력으로 비교해보기",
-    ]
+    ],
+    default="Rule-based .vs. AI-based 웹앱 소개",
+    selection_mode="single",
 )
 
 if page == "Rule-based .vs. AI-based 웹앱 소개":
@@ -353,3 +369,5 @@ elif page == "Test 데이터로 비교해보기":
     show_test_compare_page()
 elif page == "사용자 입력으로 비교해보기":
     show_user_input_page()
+else:
+    show_intro_page()
