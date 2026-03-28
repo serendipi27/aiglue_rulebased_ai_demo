@@ -20,19 +20,35 @@ SCENARIOS = {
 }
 
 def rule_based_decision(row):
-    t = row["temperature"]
-    p = row["pressure"]
-    v = row["vibration"]
-    pt = row["process_time"]
+    """
+    Rule-based 품질 판정
+    - 불량: temperature >= 82 and pressure >= 58
+    - 주의: vibration >= 8.0
+    - 정상: temperature <= 65 and pressure <= 45 and vibration <= 4.0 and process_time <= 55
+    - 그 외: 판단못함
+    """
+    try:
+        t = float(row.get("temperature"))
+        p = float(row.get("pressure"))
+        v = float(row.get("vibration"))
+        pt = float(row.get("process_time"))
+    except (TypeError, ValueError, AttributeError):
+        return "판단못함", "입력값 형식이 올바르지 않아 Rule-based 판정을 수행할 수 없음"
 
+    # 1) 불량
     if t >= 82 and p >= 58:
         return "불량", "온도 >= 82 이고 압력 >= 58 이므로 불량"
-    elif v >= 8.0:
+
+    # 2) 주의
+    if v >= 8.0:
         return "주의", "진동 >= 8.0 이므로 주의"
-    elif t <= 65 and p <= 45 and v <= 4.0 and pt <= 55:
+
+    # 3) 정상
+    if t <= 65 and p <= 45 and v <= 4.0 and pt <= 55:
         return "정상", "정상 기준(온도/압력/진동/가공시간)을 모두 만족"
-    else:
-        return "판단못함", "현재 입력은 정의된 규칙 범위에 없음"
+
+    # 4) 규칙 외 케이스
+    return "판단못함", "현재 입력은 정의된 규칙 범위에 없음"
 
 @st.cache_resource
 def load_model():
