@@ -30,10 +30,29 @@ st.markdown(
     [data-testid="stSidebarNav"] {
         display: none;
     }
+
+    /* 사이드바 버튼 간격 조금 정리 */
+    section[data-testid="stSidebar"] .stButton {
+        width: 100%;
+    }
+
+    section[data-testid="stSidebar"] .stButton > button {
+        width: 100%;
+        border-radius: 10px;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+        font-weight: 600;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
+
+# -----------------------------------
+# 세션 상태 초기화
+# -----------------------------------
+if "selected_page" not in st.session_state:
+    st.session_state.selected_page = "intro"
 
 # -----------------------------------
 # 공통 스타일
@@ -48,6 +67,45 @@ def highlight_unknown_row(row):
     return [""] * len(row)
 
 
+# -----------------------------------
+# 사이드바 페이지 버튼
+# -----------------------------------
+def render_sidebar_navigation():
+    st.sidebar.title("메뉴")
+    st.sidebar.markdown("### 페이지 선택")
+
+    intro_type = "primary" if st.session_state.selected_page == "intro" else "secondary"
+    test_type = "primary" if st.session_state.selected_page == "test" else "secondary"
+    user_type = "primary" if st.session_state.selected_page == "user" else "secondary"
+
+    if st.sidebar.button(
+        "Rule-based .vs. AI-based 웹앱 소개",
+        use_container_width=True,
+        type=intro_type,
+        key="btn_intro"
+    ):
+        st.session_state.selected_page = "intro"
+
+    if st.sidebar.button(
+        "Test 데이터로 비교해보기",
+        use_container_width=True,
+        type=test_type,
+        key="btn_test"
+    ):
+        st.session_state.selected_page = "test"
+
+    if st.sidebar.button(
+        "사용자 입력으로 비교해보기",
+        use_container_width=True,
+        type=user_type,
+        key="btn_user"
+    ):
+        st.session_state.selected_page = "user"
+
+
+# -----------------------------------
+# 소개 페이지
+# -----------------------------------
 def show_intro_page():
     st.title("🏭 Rule-based .vs. AI-based 웹앱 소개")
 
@@ -100,6 +158,9 @@ def show_intro_page():
     st.info("왼쪽 사이드바에서 페이지를 선택해 주세요.")
 
 
+# -----------------------------------
+# Test 데이터 비교 페이지
+# -----------------------------------
 def show_test_compare_page():
     st.title("📄 Test 데이터로 비교해보기")
     st.caption("CSV 테스트 데이터를 불러와 Rule-based와 AI-based 결과를 비교합니다.")
@@ -254,6 +315,9 @@ def show_test_compare_page():
         st.write("- " + msg)
 
 
+# -----------------------------------
+# 사용자 입력 비교 페이지
+# -----------------------------------
 def show_user_input_page():
     st.title("🎛️ 사용자 입력으로 비교해보기")
     st.caption("슬라이더로 값을 조정하며 Rule-based와 AI-based 결과를 즉시 비교합니다.")
@@ -348,26 +412,15 @@ def show_user_input_page():
 
 
 # -----------------------------------
-# 사이드바 네비게이션
+# 실행
 # -----------------------------------
-st.sidebar.title("메뉴")
+render_sidebar_navigation()
 
-page = st.sidebar.segmented_control(
-    "페이지 선택",
-    options=[
-        "Rule-based .vs. AI-based 웹앱 소개",
-        "Test 데이터로 비교해보기",
-        "사용자 입력으로 비교해보기",
-    ],
-    default="Rule-based .vs. AI-based 웹앱 소개",
-    selection_mode="single",
-)
-
-if page == "Rule-based .vs. AI-based 웹앱 소개":
+if st.session_state.selected_page == "intro":
     show_intro_page()
-elif page == "Test 데이터로 비교해보기":
+elif st.session_state.selected_page == "test":
     show_test_compare_page()
-elif page == "사용자 입력으로 비교해보기":
+elif st.session_state.selected_page == "user":
     show_user_input_page()
 else:
     show_intro_page()
