@@ -151,7 +151,7 @@ def render_sidebar_navigation():
         st.session_state.selected_page = "user"
 
     if st.sidebar.button(
-        "제조데이터 품질검사",
+        "제조데이터 업로드 & 품질검사",
         use_container_width=True,
         type=mfg_type,
         key="btn_mfg_quality"
@@ -259,7 +259,7 @@ def show_test_compare_page():
     st.dataframe(
         styled_df,
         use_container_width=True,
-        hide_index=True
+        hide_index=False
     )
 
     st.warning("노란색으로 표시된 행은 Rule-based에서 '판단못함'으로 처리된 케이스입니다.")
@@ -277,7 +277,7 @@ def show_test_compare_page():
         st.dataframe(
             styled_rule_df,
             use_container_width=True,
-            hide_index=True
+            hide_index=False
         )
 
     with right:
@@ -285,7 +285,7 @@ def show_test_compare_page():
         st.dataframe(
             df[FEATURES + ["ai_based_result"]],
             use_container_width=True,
-            hide_index=True
+            hide_index=False
         )
 
     st.markdown("---")
@@ -303,7 +303,7 @@ def show_test_compare_page():
         st.dataframe(
             styled_unknown_df,
             use_container_width=True,
-            hide_index=True
+            hide_index=False
         )
 
         for idx, row in unknown_df.iterrows():
@@ -420,7 +420,7 @@ def show_user_input_page():
 
     st.subheader("현재 입력값")
     input_df = pd.DataFrame([row_dict])[FEATURES]
-    st.dataframe(input_df, use_container_width=True, hide_index=True)
+    st.dataframe(input_df, use_container_width=True, hide_index=False)
 
     rule_result, rule_reason = rule_based_decision(row_dict)
     ai_result, probs = predict_ai(row_dict)
@@ -478,7 +478,7 @@ def show_user_input_page():
 # 제조데이터 품질검사 페이지
 # -----------------------------------
 def show_manufacturing_quality_page():
-    st.title("🧪 제조데이터 품질검사")
+    st.title("🧪 제조데이터 업로드 & 품질검사")
     st.caption("CSV 파일을 업로드하고 Rule-based와 AI-based 품질검사 결과를 확인합니다.")
 
     st.markdown("### 1. 제조데이터 업로드")
@@ -510,10 +510,10 @@ def show_manufacturing_quality_page():
         return
 
     st.markdown("### 2. 업로드한 파일 내용")
-    st.dataframe(upload_df, use_container_width=True, hide_index=True)
+    st.dataframe(upload_df, use_container_width=True, hide_index=False)
 
     run_button = st.button(
-        "제조데이터 품질검사 실시",
+        "품질검사 실시",
         type="primary",
         use_container_width=False,
         key="run_manufacturing_quality_check"
@@ -534,7 +534,7 @@ def show_manufacturing_quality_page():
             st.dataframe(
                 styled_rule_df,
                 use_container_width=True,
-                hide_index=True
+                hide_index=False
             )
 
         with col2:
@@ -543,7 +543,7 @@ def show_manufacturing_quality_page():
             st.dataframe(
                 ai_df,
                 use_container_width=True,
-                hide_index=True
+                hide_index=False
             )
 
         unknown_count = (result_df["rule_based_result"] == "판단못함").sum()
